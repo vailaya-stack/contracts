@@ -1,0 +1,19 @@
+name: Version
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # A pull request that changes what services build against must raise `version`
+  # in lakefile.toml to one that is not released yet.
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - run: python3 scripts/check_version.py "origin/${{ github.base_ref }}"

@@ -1,0 +1,27 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  # Tags main `v<version>`, the tag services pin, unless that version is released already.
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Tag the release
+        run: |
+          version="$(python3 -c 'import tomllib; print(tomllib.load(open("lakefile.toml", "rb"))["version"])')"
+          if git rev-parse --verify --quiet "refs/tags/v${version}" >/dev/null; then
+            echo "v${version} is already released"
+          else
+            git tag "v${version}"
+            git push origin "v${version}"
+          fi
