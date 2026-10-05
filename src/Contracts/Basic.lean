@@ -1,1 +1,1 @@
-def hello := "world"
+/-! Placeholder. The contracts will be stated here. -/
