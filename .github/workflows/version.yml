@@ -3,17 +3,46 @@ name: Version
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+  actions: write
 
 jobs:
-  # A pull request that changes what services build against must raise `version`
-  # in lakefile.toml to one that is not released yet.
+  # A pull request that changes what services build against must raise `version` in
+  # lakefile.toml to one that is not released yet. When it did not, this raises it on the
+  # branch: by a patch step from main's version, or by the step its `minor` or `major`
+  # label names.
   version:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
+          ref: ${{ github.head_ref || github.ref }}
           fetch-depth: 0
-      - run: python3 scripts/check_version.py "origin/${{ github.base_ref }}"
+
+      # Not for a pull request from a fork, whose branch this workflow cannot write.
+      - name: Raise the version when the change needs it
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.head_ref }}
+          LEVEL: ${{ contains(github.event.pull_request.labels.*.name, 'major') && 'major' || contains(github.event.pull_request.labels.*.name, 'minor') && 'minor' || 'patch' }}
+        run: |
+          python3 scripts/check_version.py --fix --level "${LEVEL}" origin/main
+          if git diff --quiet lakefile.toml; then
+            exit 0
+          fi
+          version="$(python3 -c 'import tomllib; print(tomllib.load(open("lakefile.toml", "rb"))["version"])')"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --quiet --all --message "Raise the version to ${version}"
+          git push --quiet origin "HEAD:${BRANCH}"
+          # A commit pushed with this workflow's token starts no workflow, so start the
+          # required checks of the new commit here.
+          gh workflow run "Lean Action CI" --ref "${BRANCH}"
+          gh workflow run "Version" --ref "${BRANCH}"
+
+      - run: python3 scripts/check_version.py origin/main
