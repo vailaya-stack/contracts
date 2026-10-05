@@ -1,5 +1,5 @@
 name = "contracts"
-version = "0.2.1"
+version = "0.2.2"
 description = "The contracts the services of vailaya-stack are written against."
 keywords = ["math"]
 defaultTargets = ["Contracts"]
@@ -18,3 +18,4 @@ rev = "v4.34.1"
 [[lean_lib]]
 name = "Contracts"
 srcDir = "src"
+globs = ["Contracts.*"] # every file under src/Contracts/, imported by the root or not

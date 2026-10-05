@@ -1,5 +1,45 @@
 # contracts
 
+The contracts the services of vailaya-stack are written against, in Lean 4 with Mathlib.
+
+## Where files go
+
+| File | Module | Holds |
+|---|---|---|
+| `src/Contracts.lean` | `Contracts` | Only imports: one line per file below, so `import Contracts` gives everything. |
+| `src/Contracts/Utils.lean` | `Contracts.Utils` | What every contract is stated with. |
+| `src/Contracts/SortService.lean` | `Contracts.SortService` | The contract of the sort service. |
+| `src/Contracts/MinService.lean` | `Contracts.MinService` | The contract of the min service. |
+
+A file `src/Contracts/A/B.lean` is the module `Contracts.A.B`, and another file imports it with
+`import Contracts.A.B`. `lake build` compiles every `.lean` file under `src/Contracts/`, whether
+or not `src/Contracts.lean` imports it. A `.lean` file anywhere else, such as directly in `src/`
+or at the top of the repository, belongs to no library: Lake does not compile it and nothing can
+import it.
+
+## Working locally
+
+Open the `contracts` folder itself in the editor, not its parent, so Lean finds
+`lean-toolchain` and `lakefile.toml`.
+
+```sh
+lake exe cache get                     # once per clone: download Mathlib's build
+lake build                             # compile everything; errors show here
+lake lean src/Contracts/Utils.lean     # compile one file
+```
+
+To try a change in a service before releasing it, leave the change uncommitted here and, in
+the service, turn on its local override (its README has the commands). The service then builds
+this folder as it is on disk.
+
+Before opening a pull request, commit and run
+
+```sh
+python3 scripts/check_version.py origin/main
+```
+
+It says whether the change needs a new version. The pull request raises it when you did not.
+
 ## Versions
 
 `version` in `lakefile.toml` is the version of the contracts. Services pin a release by its
