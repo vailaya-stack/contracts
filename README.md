@@ -53,9 +53,12 @@ tag, `v<version>`.
   request's `minor` or `major` label names.
 - On every push to `main`, the `Release` workflow tags the commit `v<version>` unless that
   version is released already. Release tags cannot be moved or deleted.
-- Each service checks hourly for a new release and opens its own upgrade pull request. With
-  a secret `SERVICES_DISPATCH_TOKEN` that can write to the services, `Release` starts those
-  checks at once.
+- `Release` then tells each service, which opens its own upgrade pull request. The services
+  also check hourly, in case that was missed.
+
+Workflows that write to another repository, or push commits whose checks must run, act as the
+org's GitHub App `vailaya-stack-app`, with the org variable `BOT_APP_ID` and the org secret
+`BOT_PRIVATE_KEY`.
 
 A release is tied to the Lean toolchain and the Mathlib revision it was built on, so moving
 either is a new version.

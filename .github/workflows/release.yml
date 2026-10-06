@@ -8,11 +8,10 @@ permissions:
   contents: write
 
 jobs:
-  # Tags main `v<version>`, the tag services pin, unless that version is released already.
+  # Tags main `v<version>`, the tag services pin, unless that version is released already,
+  # and tells the services so they open their upgrade pull requests at once.
   release:
     runs-on: ubuntu-latest
-    env:
-      DISPATCH_TOKEN: ${{ secrets.SERVICES_DISPATCH_TOKEN }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -30,13 +29,21 @@ jobs:
             echo "created=true" >> "${GITHUB_OUTPUT}"
           fi
 
-      # Optional. This workflow's own token reaches no other repository; with a secret
-      # SERVICES_DISPATCH_TOKEN that can write to the services, their upgrade starts now
-      # instead of at their next hourly check.
+      # This workflow's own token reaches no other repository; the org's app reaches all
+      # of them.
+      - name: Get the app's token
+        id: app
+        if: steps.tag.outputs.created == 'true'
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
       - name: Tell the services
-        if: steps.tag.outputs.created == 'true' && env.DISPATCH_TOKEN != ''
+        if: steps.tag.outputs.created == 'true'
         env:
-          GH_TOKEN: ${{ env.DISPATCH_TOKEN }}
+          GH_TOKEN: ${{ steps.app.outputs.token }}
         run: |
           for service in min-service sort-service; do
             gh api "repos/${GITHUB_REPOSITORY_OWNER}/${service}/dispatches" -f event_type=contracts-released
