@@ -1,5 +1,5 @@
 name = "contracts"
-version = "0.2.3"
+version = "0.2.4"
 description = "The contracts the services of vailaya-stack are written against."
 keywords = ["math"]
 defaultTargets = ["Contracts"]
