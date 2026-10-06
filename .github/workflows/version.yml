@@ -6,25 +6,41 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   # A pull request that changes what services build against must raise `version` in
   # lakefile.toml to one that is not released yet. When it did not, this raises it on the
   # branch: by a patch step from main's version, or by the step its `minor` or `major`
   # label names.
+  #
+  # The raise is pushed as the org's app, vailaya-stack-app, so the checks of the new
+  # commit run as for any push. They run this job again, which finds the version raised
+  # and pushes nothing.
   version:
     runs-on: ubuntu-latest
     steps:
+      # Not for a pull request from a fork, which gets no secrets and whose branch the app
+      # cannot write. There the check below fails until the author raises the version.
+      - name: Get the app's token
+        id: app
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.head_ref }}
           fetch-depth: 0
+          token: ${{ steps.app.outputs.token || github.token }}
 
-      # Not for a pull request from a fork, whose branch this workflow cannot write.
       - name: Raise the version when the change needs it
-        if: github.event.pull_request.head.repo.full_name == github.repository
+        if: steps.app.outputs.token != ''
         env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP: ${{ steps.app.outputs.app-slug }}
           BRANCH: ${{ github.head_ref }}
           LEVEL: ${{ contains(github.event.pull_request.labels.*.name, 'major') && 'major' || contains(github.event.pull_request.labels.*.name, 'minor') && 'minor' || 'patch' }}
         run: |
@@ -33,11 +49,10 @@ jobs:
             exit 0
           fi
           version="$(python3 -c 'import tomllib; print(tomllib.load(open("lakefile.toml", "rb"))["version"])')"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          id="$(gh api "/users/${APP}%5Bbot%5D" --jq .id)"
+          git config user.name "${APP}[bot]"
+          git config user.email "${id}+${APP}[bot]@users.noreply.github.com"
           git commit --quiet --all --message "Raise the version to ${version}"
-          # GitHub holds the checks of a commit pushed with this workflow's token until
-          # someone with write access approves them on the pull request.
           git push --quiet origin "HEAD:${BRANCH}"
 
       - run: python3 scripts/check_version.py origin/main
